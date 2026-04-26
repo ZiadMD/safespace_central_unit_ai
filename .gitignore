@@ -1,0 +1,96 @@
+# ==========================================
+# Python Core
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# ==========================================
+# Virtual Environments
+# ==========================================
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+.env
+.venv
+
+# ==========================================
+# FastAPI & Config
+# ==========================================
+# Ignore environment files containing secrets
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# SQLite databases (if using one for the API)
+*.sqlite3
+*.db
+
+# ==========================================
+# Computer Vision & YOLO
+# ==========================================
+# Pre-trained and custom model weights
+*.pt
+*.onnx
+*.engine
+*.tflite
+*.pb
+*.h5
+*.hdf5
+
+# YOLO Specific Outputs & Caches
+runs/
+*.cache
+
+# Datasets, Images, and Video Outputs
+# (It is best practice to keep large media out of version control)
+data/
+datasets/
+images/
+labels/
+videos/
+output/
+*.mp4
+*.avi
+*.jpg
+*.jpeg
+*.png
+
+# ==========================================
+# Jupyter Notebooks (Optional, for CV testing)
+# ==========================================
+.ipynb_checkpoints/
+
+# ==========================================
+# IDEs & OS Specific
+# ==========================================
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db

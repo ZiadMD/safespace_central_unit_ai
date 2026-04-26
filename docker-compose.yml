@@ -1,0 +1,30 @@
+version: "3.9"
+services:
+  ai_engine:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./weights:/app/weights
+    environment:
+      - ENABLE_VEHICLE_DETECTION=true
+      - ENABLE_PLATE_DETECTION=true
+      - ENABLE_OCR=true
+      - ENABLE_DB_STORAGE=false
+      - RTSP_URL=rtsp://localhost:8554/stream
+      - BACKEND_ALERT_URL=http://backend:3000/api/incidents/flag
+      - OCR_ENGINE=easyocr
+    depends_on:
+      - db
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: safespace
+      POSTGRES_PASSWORD: safespace
+      POSTGRES_DB: safespace
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+volumes:
+  pgdata:

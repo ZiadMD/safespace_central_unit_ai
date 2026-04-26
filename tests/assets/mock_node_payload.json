@@ -1,0 +1,21 @@
+{
+    "lat": 30.0444,
+    "long": 31.2357,
+    "lanNumber": 1,
+    "nodeId": "test-node-001",
+    "accidentPolygon": {
+        "points": [{"x": 10, "y": 10}, {"x": 100, "y": 10}, {"x": 100, "y": 100}, {"x": 10, "y": 100}],
+        "baseWidth": 1920,
+        "baseHeight": 1080
+    },
+    "detections": [
+        {
+            "bbox": [50, 50, 200, 200],
+            "confidence": 0.85,
+            "classId": 0
+        }
+    ],
+    "media": [
+        "data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA="
+    ]
+}

@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic-settings
+ultralytics
+opencv-python-headless
+easyocr
+httpx
+sqlalchemy[asyncio]
+asyncpg
+numpy
+python-multipart
+pytest
+pytest-asyncio
+httpx
