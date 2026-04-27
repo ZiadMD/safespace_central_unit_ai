@@ -109,7 +109,7 @@ async def run_analysis_pipeline(
         pipeline_steps_run=steps_run,
         processing_time_ms=execution_time_ms
     )
-    
+    # TODO save data and send it to CU.
     # Store permanently if enabled
     await db_service.store_result(result)
     

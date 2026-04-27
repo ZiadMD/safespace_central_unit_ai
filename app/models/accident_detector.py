@@ -35,8 +35,8 @@ class AccidentDetector(BaseDetector):
                 class_id = int(box.cls[0])
                 bbox = box.xyxy[0].tolist()  # [x1, y1, x2, y2]
                 
-                # Class 0 -> severe, Class 1 -> moderate
-                severity_label = "severe" if class_id == 0 else "moderate" if class_id == 1 else "unknown"
+                # Model classes: 0 -> moderate, 1 -> severe
+                severity_label = "moderate" if class_id == 0 else "severe" if class_id == 1 else "unknown"
                 
                 detections.append({
                     "bbox": bbox,

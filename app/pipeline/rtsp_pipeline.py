@@ -106,4 +106,5 @@ class RTSPManager:
             cap.release()
             self._running = False
 
+    # TODO: add a record stream Method 
 rtsp_manager = RTSPManager()

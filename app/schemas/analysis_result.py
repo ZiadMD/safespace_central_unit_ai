@@ -2,12 +2,12 @@ from pydantic import BaseModel
 from typing import List, Optional
 
 class PlateResult(BaseModel):
-    bbox: List[int]
+    bbox: List[float]
     plate_text: Optional[str]
     ocr_confidence: Optional[float]
 
 class VehicleResult(BaseModel):
-    bbox: List[int]
+    bbox: List[float]
     confidence: float
     class_name: str
     plate: Optional[PlateResult]

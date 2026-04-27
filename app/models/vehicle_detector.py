@@ -8,8 +8,8 @@ from app.utils.logger import logger
 class VehicleDetector(BaseDetector):
     def __init__(self):
         self.model = None
-        # COCO IDs: 2: car, 3: motorcycle, 5: bus, 7: truck
-        self.valid_classes = {2: "car", 3: "motorcycle", 5: "bus", 7: "truck"}
+        # Custom model classes (not COCO): 0: car, 1: pedestrian, 2: cyclist
+        self.valid_classes = {0: "car", 1: "pedestrian", 2: "cyclist"}
         
     def load_model(self, model_path: str) -> None:
         if os.path.exists(model_path):
