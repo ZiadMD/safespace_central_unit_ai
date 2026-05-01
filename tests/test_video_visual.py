@@ -1,17 +1,19 @@
 """
-Visual Pipeline Tester – Safe Space AI Engine (Deeper Analysis Only)
-=====================================================================
-Runs the deeper analysis models directly on the full frame:
-  1. Vehicle detection    (full frame)
+Live Stream Tester – Safe Space AI Engine (Deeper Analysis)
+=============================================================
+Treats ANY source (video file, RTSP, webcam) as a live stream:
+  1. Vehicle detection    (full frame)  — custom model OR YOLOv8n (COCO)
   2. Plate detection      (inside each vehicle bbox)
   3. OCR                  (on each plate crop)
 
-No accident detection — this tests the analysis pipeline in isolation.
+The source loops forever when it's a file — simulating a continuous feed.
+Press 'q' to stop the stream at any time.
 
 Usage:
-    cd safespace_central_unit_ai
     python -m tests.test_video_visual
-    python -m tests.test_video_visual --video path/to/video.mp4
+    python -m tests.test_video_visual --source rtsp://192.168.1.100:8554/live
+    python -m tests.test_video_visual --source 0               # webcam
+    python -m tests.test_video_visual --detector yolov8n
     python -m tests.test_video_visual --headless
 """
 
@@ -32,12 +34,14 @@ from app.utils.logger import logger
 from app.utils.image_utils import crop_bbox, offset_bbox
 
 # ── Color palette (BGR) ─────────────────────────────────────────────
-COLOR_VEHICLE   = (0, 255, 0)       # Green
-COLOR_PLATE     = (255, 200, 0)     # Cyan-ish
-COLOR_OCR_TEXT  = (255, 255, 255)   # White
-COLOR_PANEL_BG  = (30, 30, 30)
+COLOR_VEHICLE    = (0, 255, 0)       # Green
+COLOR_PLATE      = (255, 200, 0)     # Cyan-ish
+COLOR_OCR_TEXT   = (255, 255, 255)   # White
+COLOR_PANEL_BG   = (30, 30, 30)
 COLOR_PANEL_TEXT = (200, 200, 200)
-COLOR_HIGHLIGHT  = (0, 220, 255)    # Yellow-ish
+COLOR_HIGHLIGHT  = (0, 220, 255)     # Yellow-ish
+COLOR_LIVE_DOT   = (0, 0, 255)      # Red
+
 
 # ── Drawing helpers ──────────────────────────────────────────────────
 
@@ -69,22 +73,52 @@ def draw_info_panel(frame: np.ndarray, info_lines: List[str],
     return frame
 
 
+def draw_live_badge(frame: np.ndarray, elapsed_s: float) -> None:
+    """Draw a pulsing ● LIVE badge + elapsed time at the top-left."""
+    # Pulse the dot opacity
+    pulse = int(200 + 55 * np.sin(elapsed_s * 4))
+    dot_color = (0, 0, pulse)
+
+    cv2.circle(frame, (28, 28), 8, dot_color, -1)
+    cv2.putText(frame, "LIVE", (44, 34),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2, cv2.LINE_AA)
+
+    # Elapsed time
+    mins, secs = divmod(int(elapsed_s), 60)
+    hrs, mins = divmod(mins, 60)
+    ts = f"{hrs:02d}:{mins:02d}:{secs:02d}"
+    cv2.putText(frame, ts, (110, 34),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_PANEL_TEXT, 1, cv2.LINE_AA)
+
+
 def draw_stage_indicator(frame: np.ndarray, stage_name: str) -> None:
     h, w = frame.shape[:2]
     cv2.putText(frame, f">> {stage_name}", (12, h - 16),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.6, COLOR_HIGHLIGHT, 2, cv2.LINE_AA)
 
 
+def fmt_elapsed(secs: float) -> str:
+    m, s = divmod(int(secs), 60)
+    h, m = divmod(m, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
 # ── Main runner ──────────────────────────────────────────────────────
 
-def run_visual_test(video_path: str, headless: bool = False,
-                    frame_skip: int = 1, output_path: str | None = None):
+def run_live_test(source: str, headless: bool = False,
+                  output_path: str | None = None):
 
-    # ── Load only the deeper analysis models ─────────────────────────
+    # ── Load models ──────────────────────────────────────────────────
     logger.info("Loading deeper analysis models...")
 
-    from app.models.vehicle_detector import vehicle_detector
-    vehicle_detector.load_model(config.VEHICLE_MODEL_PATH)
+    if config.VEHICLE_DETECTOR == "yolov8n":
+        from app.models.yolov8n_detector import yolov8n_detector as veh_det
+        veh_det.load_model()
+        logger.info("Using YOLOv8n (COCO) vehicle detector")
+    else:
+        from app.models.vehicle_detector import vehicle_detector as veh_det
+        veh_det.load_model(config.VEHICLE_MODEL_PATH)
+        logger.info("Using custom-trained vehicle detector")
 
     from app.models.plate_detector import plate_detector
     plate_detector.load_model(config.PLATE_MODEL_PATH)
@@ -94,42 +128,49 @@ def run_visual_test(video_path: str, headless: bool = False,
 
     logger.info("All models loaded.")
 
-    # ── Open video ───────────────────────────────────────────────────
-    cap = cv2.VideoCapture(video_path)
+    # ── Open source (treat as live stream) ───────────────────────────
+    # Try to interpret source as int (webcam index), otherwise string
+    try:
+        src = int(source)
+    except ValueError:
+        src = source
+
+    cap = cv2.VideoCapture(src)
     if not cap.isOpened():
-        logger.error(f"Cannot open video: {video_path}")
+        logger.error(f"Cannot open stream: {source}")
         return
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
-    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    logger.info(f"Video: {width}x{height} @ {fps:.1f}fps, {total_frames} frames")
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+    logger.info(f"Stream opened: {width}x{height} @ {fps:.0f}fps  [{source}]")
 
     display_scale = min(1.0, 1280.0 / width)
     display_w = int(width * display_scale)
     display_h = int(height * display_scale)
 
-    if output_path is None:
-        output_path = str(Path(video_path).parent / "output_annotated.mp4")
-
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+    # Output recording (optional)
+    writer = None
+    if output_path:
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(output_path, fourcc, fps, (width, height))
+        logger.info(f"Recording to: {output_path}")
 
     if not headless:
-        cv2.namedWindow("Safe Space – Deeper Analysis", cv2.WINDOW_NORMAL)
-        cv2.resizeWindow("Safe Space – Deeper Analysis", display_w, display_h)
+        cv2.namedWindow("Safe Space – LIVE", cv2.WINDOW_NORMAL)
+        cv2.resizeWindow("Safe Space – LIVE", display_w, display_h)
 
     # ── Stats ────────────────────────────────────────────────────────
-    frame_idx = 0
+    frame_count = 0
     total_vehicles = 0
     total_plates = 0
     total_ocr_reads = 0
     processing_times: List[float] = []
     paused = False
+    stream_start = time.time()
+    last_log_time = stream_start
 
-    logger.info("Starting visual test (Vehicle → Plate → OCR)...")
-    logger.info("Press 'q' to quit, SPACE to pause/resume")
+    logger.info("🔴 LIVE — Processing stream. Press 'q' to stop.")
 
     try:
         while True:
@@ -143,11 +184,15 @@ def run_visual_test(video_path: str, headless: bool = False,
 
             ret, frame = cap.read()
             if not ret:
-                break
-            frame_idx += 1
+                # For files: loop back to start (simulates endless stream)
+                cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                ret, frame = cap.read()
+                if not ret:
+                    logger.warning("Stream ended.")
+                    break
 
-            if frame_idx % frame_skip != 0:
-                continue
+            frame_count += 1
+            elapsed = time.time() - stream_start
 
             t_start = time.time()
             annotated = frame.copy()
@@ -155,8 +200,8 @@ def run_visual_test(video_path: str, headless: bool = False,
             frame_plates = 0
             frame_ocr_texts: List[str] = []
 
-            # ── STAGE 1: Vehicle Detection (full frame) ──────────────
-            veh_dets = vehicle_detector.detect(frame)
+            # ── STAGE 1: Vehicle Detection ───────────────────────────
+            veh_dets = veh_det.detect(frame)
             frame_vehicles = len(veh_dets)
             total_vehicles += frame_vehicles
 
@@ -165,7 +210,7 @@ def run_visual_test(video_path: str, headless: bool = False,
                 veh_label = f"{v['class_name']} {v['confidence']:.0%}"
                 draw_bbox(annotated, veh_bbox, veh_label, COLOR_VEHICLE, thickness=2)
 
-                # ── STAGE 2: Plate Detection (inside vehicle crop) ───
+                # ── STAGE 2: Plate Detection ─────────────────────────
                 veh_crop = crop_bbox(frame, veh_bbox)
                 if veh_crop.size == 0:
                     continue
@@ -185,7 +230,7 @@ def run_visual_test(video_path: str, headless: bool = False,
                 frame_plates += 1
                 total_plates += 1
 
-                # ── STAGE 3: OCR (on plate crop) ─────────────────────
+                # ── STAGE 3: OCR ─────────────────────────────────────
                 plate_crop = crop_bbox(frame, global_plate_bbox)
                 if plate_crop.size == 0:
                     continue
@@ -202,14 +247,18 @@ def run_visual_test(video_path: str, headless: bool = False,
             t_elapsed = (time.time() - t_start) * 1000
             processing_times.append(t_elapsed)
 
+            # ── LIVE badge ───────────────────────────────────────────
+            draw_live_badge(annotated, elapsed)
+
             # ── Info panel ───────────────────────────────────────────
             avg_ms = sum(processing_times[-30:]) / max(1, len(processing_times[-30:]))
             eff_fps = 1000.0 / avg_ms if avg_ms > 0 else 0
 
             info = [
-                f"Frame: {frame_idx}/{total_frames}",
-                f"Processing: {t_elapsed:.1f}ms  (avg {avg_ms:.1f}ms)",
-                f"Effective FPS: {eff_fps:.1f}",
+                f"Uptime: {fmt_elapsed(elapsed)}",
+                f"Frames: {frame_count}",
+                f"Latency: {t_elapsed:.0f}ms  (avg {avg_ms:.0f}ms)",
+                f"FPS: {eff_fps:.1f}",
                 "─" * 30,
                 f"!Vehicles  (frame): {frame_vehicles}",
                 f"!Plates    (frame): {frame_plates}",
@@ -221,6 +270,7 @@ def run_visual_test(video_path: str, headless: bool = False,
             ]
             annotated = draw_info_panel(annotated, info)
 
+            # ── Stage indicator ──────────────────────────────────────
             if frame_vehicles:
                 stages = ["VEHICLE"]
                 if frame_plates:
@@ -229,67 +279,81 @@ def run_visual_test(video_path: str, headless: bool = False,
                     stages.append("OCR")
                 draw_stage_indicator(annotated, " → ".join(stages))
 
-            writer.write(annotated)
+            if writer:
+                writer.write(annotated)
 
             if not headless:
                 display_frame = cv2.resize(annotated, (display_w, display_h))
-                cv2.imshow("Safe Space – Deeper Analysis", display_frame)
+                cv2.imshow("Safe Space – LIVE", display_frame)
                 key = cv2.waitKey(1) & 0xFF
                 if key == ord('q'):
                     break
                 elif key == ord(' '):
                     paused = True
 
-            if frame_idx % 100 == 0:
+            # Log every 30 seconds
+            now = time.time()
+            if now - last_log_time >= 30:
                 logger.info(
-                    f"Progress: {frame_idx}/{total_frames} | "
-                    f"Vehicles: {total_vehicles} | Plates: {total_plates} | OCR: {total_ocr_reads}"
+                    f"[{fmt_elapsed(elapsed)}] Frames: {frame_count} | "
+                    f"Vehicles: {total_vehicles} | Plates: {total_plates} | "
+                    f"OCR: {total_ocr_reads} | FPS: {eff_fps:.1f}"
                 )
+                last_log_time = now
 
     except KeyboardInterrupt:
-        logger.info("Interrupted.")
+        logger.info("Stream stopped by user.")
     finally:
         cap.release()
-        writer.release()
+        if writer:
+            writer.release()
         if not headless:
             cv2.destroyAllWindows()
 
-    # ── Summary ──────────────────────────────────────────────────────
+    # ── Session summary ──────────────────────────────────────────────
+    total_elapsed = time.time() - stream_start
     avg_total = sum(processing_times) / max(1, len(processing_times))
     print(f"""
 ╔══════════════════════════════════════════════════════╗
-║       SAFE SPACE – DEEPER ANALYSIS VISUAL TEST      ║
+║       SAFE SPACE – LIVE STREAM SESSION ENDED        ║
 ╠══════════════════════════════════════════════════════╣
+║  Session duration : {fmt_elapsed(total_elapsed):>10}                      ║
 ║  Frames processed : {len(processing_times):>6}                          ║
-║  Avg processing   : {avg_total:>8.1f} ms/frame                ║
+║  Avg latency      : {avg_total:>8.1f} ms/frame                ║
 ║  ────────────────────────────────────────────────    ║
 ║  Vehicles found   : {total_vehicles:>6}                          ║
 ║  Plates found     : {total_plates:>6}                          ║
 ║  OCR reads        : {total_ocr_reads:>6}                          ║
-║  ────────────────────────────────────────────────    ║
-║  Output saved to  : {Path(output_path).name:<32} ║
 ╚══════════════════════════════════════════════════════╝
 """)
-    logger.info(f"Annotated video saved to: {output_path}")
+    if output_path:
+        logger.info(f"Recording saved to: {output_path}")
 
 
 # ── CLI ──────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Safe Space – Deeper Analysis Visual Tester")
+    parser = argparse.ArgumentParser(description="Safe Space – Live Stream Tester (Deeper Analysis)")
     parser.add_argument(
-        "--video", type=str,
+        "--source", type=str,
         default=str(PROJECT_ROOT / "tests" / "assets" / "videos" / "14468488_3840_2160_30fps.mp4"),
-        help="Path to test video"
+        help="Video file, RTSP URL, or webcam index (e.g. 0)"
     )
     parser.add_argument("--headless", action="store_true", help="No display window")
-    parser.add_argument("--frame-skip", type=int, default=3, help="Process every Nth frame")
-    parser.add_argument("--output", type=str, default=None, help="Output video path")
+    parser.add_argument("--output", type=str, default=None, help="Record output to file")
+    parser.add_argument(
+        "--detector", choices=["custom", "yolov8n"], default=None,
+        help="Vehicle detector: 'custom' (trained) or 'yolov8n' (COCO)"
+    )
 
     args = parser.parse_args()
-    run_visual_test(
-        video_path=args.video,
+
+    if args.detector:
+        config.VEHICLE_DETECTOR = args.detector
+        logger.info(f"Vehicle detector overridden to: {args.detector}")
+
+    run_live_test(
+        source=args.source,
         headless=args.headless,
-        frame_skip=args.frame_skip,
         output_path=args.output,
     )

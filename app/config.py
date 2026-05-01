@@ -25,9 +25,13 @@ class Settings(BaseSettings):
     # Backend alert URL (where CU sends alerts to backend)
     BACKEND_ALERT_URL: str = "http://backend:3000/api/incidents/flag"
 
-    # OCR engine: "easyocr" | "custom"
-    OCR_ENGINE: str = "easyocr"
+    # Vehicle detector: "custom" (trained model) | "yolov8n" (COCO pretrained)
+    VEHICLE_DETECTOR: str = "custom"
+
+    # OCR engine: "easyocr" | "parseq"
+    OCR_ENGINE: str = "parseq"
     OCR_LANGUAGES: List[str] = ["ar", "en"]
+    OCR_MIN_CONFIDENCE: float = 0.4  # Min OCR confidence to accept a reading
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

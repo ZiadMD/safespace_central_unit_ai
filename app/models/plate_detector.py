@@ -20,7 +20,7 @@ class PlateDetector(BaseDetector):
         if not self.model or frame.size == 0:
             return []
             
-        results = self.model(frame, verbose=False)
+        results = self.model(frame, verbose=False, device='cpu')
         detections = []
         
         for result in results:
