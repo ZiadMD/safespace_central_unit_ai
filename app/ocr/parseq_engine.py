@@ -6,6 +6,7 @@ from typing import Optional, Tuple
 
 from app.ocr.base_ocr import BaseOCR
 from app.utils.logger import logger
+from app.utils.device import DEVICE
 
 
 class PARSeqEngine(BaseOCR):
@@ -17,7 +18,7 @@ class PARSeqEngine(BaseOCR):
 
     def __init__(self):
         self.model = None
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device(DEVICE)
         self.transform = T.Compose([
             T.Resize((32, 128)),
             T.ToTensor(),

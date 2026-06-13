@@ -5,6 +5,7 @@ from ultralytics import YOLO
 from app.models.base_detector import BaseDetector
 from app.config import config
 from app.utils.logger import logger
+from app.utils.device import DEVICE
 
 class AccidentDetector(BaseDetector):
     def __init__(self):
@@ -22,7 +23,7 @@ class AccidentDetector(BaseDetector):
         if not self.model:
             return []
             
-        results = self.model(frame, verbose=False, device='cpu')
+        results = self.model(frame, verbose=False, device=DEVICE)
         detections = []
         
         for result in results:

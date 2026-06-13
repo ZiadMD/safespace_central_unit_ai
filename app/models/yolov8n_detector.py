@@ -13,6 +13,7 @@ from typing import List, Dict, Any
 from ultralytics import YOLO
 from app.models.base_detector import BaseDetector
 from app.utils.logger import logger
+from app.utils.device import DEVICE
 
 
 # COCO classes that qualify as "vehicles"
@@ -30,7 +31,8 @@ class YOLOv8nDetector(BaseDetector):
     def __init__(self):
         self.model = None
         self.valid_classes = COCO_VEHICLE_CLASSES
-        self.conf_threshold = 0.25  # COCO default is fine
+        self.conf_threshold = 0.25
+        self.device = DEVICE
 
     def load_model(self, model_path: str = "yolov8n.pt") -> None:
         """
@@ -51,7 +53,7 @@ class YOLOv8nDetector(BaseDetector):
         results = self.model(
             frame,
             verbose=False,
-            device="cpu",
+            device=self.device,
             conf=self.conf_threshold,
         )
 

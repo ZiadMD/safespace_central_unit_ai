@@ -186,7 +186,7 @@ def run_live_tracking(
 
     # Output recording (optional)
     writer = None
-    if output_path:
+    if output_path:/home/ziadmoh/Desktop/Safe Space/Safespace_AI/assets/Video Test/T1.mp4
         writer = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*"mp4v"), fps, (w, h))
         logger.info(f"Recording to: {output_path}")
 

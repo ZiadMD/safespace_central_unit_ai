@@ -4,9 +4,11 @@ from typing import List, Dict, Any
 from ultralytics import YOLO
 from app.models.base_detector import BaseDetector
 from app.utils.logger import logger
+from app.utils.device import DEVICE
 
 class PlateDetector(BaseDetector):
     def __init__(self):
+        self.device = DEVICE
         self.model = None
         
     def load_model(self, model_path: str) -> None:
@@ -20,7 +22,7 @@ class PlateDetector(BaseDetector):
         if not self.model or frame.size == 0:
             return []
             
-        results = self.model(frame, verbose=False, device='cpu')
+        results = self.model(frame, verbose=False, device=self.device)
         detections = []
         
         for result in results:

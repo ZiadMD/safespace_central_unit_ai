@@ -4,10 +4,12 @@ from typing import List, Dict, Any
 from ultralytics import YOLO
 from app.models.base_detector import BaseDetector
 from app.utils.logger import logger
+from app.utils.device import DEVICE
 
 class VehicleDetector(BaseDetector):
     def __init__(self):
         self.model = None
+        self.device = DEVICE
         # Custom model classes (not COCO): 0: car, 1: pedestrian, 2: cyclist
         self.valid_classes = {0: "car", 1: "pedestrian", 2: "cyclist"}
         
@@ -22,7 +24,7 @@ class VehicleDetector(BaseDetector):
         if not self.model:
             return []
             
-        results = self.model(frame, verbose=False, device='cpu')
+        results = self.model(frame, verbose=False, device=self.device)
         detections = []
         
         for result in results:

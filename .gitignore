@@ -61,6 +61,7 @@ logs/
 *.pb
 *.h5
 *.hdf5
+*.zip
 
 # YOLO Specific Outputs & Caches
 runs/

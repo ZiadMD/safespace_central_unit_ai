@@ -14,6 +14,7 @@ class DetectionDetail(BaseModel):
     bbox: List[int]          # [x1, y1, x2, y2]
     confidence: float
     classId: int
+    class_name: str = ""     # Accept class_name from the edge node or manual injection
 
 class NodeAccidentPayload(BaseModel):
     lat: float
